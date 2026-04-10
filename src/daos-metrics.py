@@ -245,10 +245,11 @@ def main():
 
     while True:
 
+        print("collecting telemetry... ", end='')
         s=datetime.datetime.now()
         df = collect_once(servers, port)
         e=datetime.datetime.now()
-        print("collection time: {0}".format(e-s))
+        print("time: {0}".format(e-s))
 
         df['pool'] = df['pool'].map(pools)
 
@@ -259,7 +260,7 @@ def main():
         #for row in df[df['key'] == 'engine_pool_ops_pool_connect'].itertuples():
         #for row in df[df['key'] == 'engine_pool_ops_cont_open'].itertuples():
         for row in df[df['key'] == args.metric].itertuples():
-            if row.value > 0:
+            #if row.value > 0:
                 print(row)
 
         if args.metric and args.ranks:
