@@ -25,10 +25,23 @@ def fetch_pool_ids():
 # Metric parsing
 # ------------------------------------------------------------
 
-    #r'(?P<key>[^{]+)\{rank="(?P<rank>\d+)",target="(?P<target>\d+)"\}\s+(?P<value>[-+]?\d*\.?\d+)'
 metric_line_re = re.compile(
-    r'(?P<key>[^{]+)\{pool="(?P<pool>[a-zA-Z0-9_\-]+)",rank="(?P<rank>\d+)"\}\s+(?P<value>[-+]?\d*\.?\d+)'
+    r'(?P<key>[^{]+)\{'
+    r'(pool="(?P<pool>[a-zA-Z0-9_\-]+)",)?'
+    r'rank="(?P<rank>\d+)"'
+    r'(,size="(?P<size>\w+)")?'
+    r'(,target="(?P<target>\d+)")?'
+    r'\}\s+(?P<value>[-+]?\d*\.?\d+(e[+-]\d+)?)'
 )
+
+pool_strings =["engine_pool_ops_cont_open"
+]
+
+latency_strings =["engine_io_latency_tgt_update_samples",
+    "engine_io_latency_tgt_update_sum",
+    "engine_io_latency_fetch_samples",
+    "engine_io_latency_fetch_sum"
+]
 
 def parse_metrics(text, timestamp):
 
@@ -38,20 +51,26 @@ def parse_metrics(text, timestamp):
 
         if line.startswith('#') or not line.strip():
             continue
-
+#        print(line)
         m = metric_line_re.match(line)
 
         if not m:
             continue
 
-        rows.append({
-            "timestamp": timestamp,
-            "key": m.group("key"),
-            "rank": int(m.group("rank")),
-            "pool": m.group("pool"),
-            #"target": int(m.group("target")),
-            "value": float(m.group("value"))
-        })
+        filled_target = int(m.group("target")) if m.group("target") else -1
+        filled_size = m.group("size") if m.group("size") else "NA"
+        filled_pool = m.group("pool") if m.group("pool") else "NA"
+
+        if ((m.group("key") in pool_strings) or ((m.group("key") in latency_strings) and ((m.group("size") == "128KB") or (m.group("size") == "1MB")))):
+            rows.append({
+                "timestamp": timestamp,
+                "key": m.group("key"),
+                "pool": filled_pool,
+                "rank": int(m.group("rank")),
+                "target": filled_target,
+                "size": filled_size,
+                "value": float(m.group("value"))
+            })
 
     return rows
 
@@ -198,15 +217,29 @@ def main():
 
     parser.add_argument("--config", required=True)
 
-    parser.add_argument("--metric")
     parser.add_argument("--ranks")
 
     parser.add_argument("--interval", type=int, default=0)
+
+    parser.add_argument("--previous_metrics",
+        type=str,
+        default=None,   # value if not provided
+        help="Optional previous metrics filename"
+    )
+
+    parser.add_argument("--current_metrics",
+        type=str,
+        default=None,   # value if not provided
+        help="Optional current metrics filename"
+    )
 
     args = parser.parse_args()
 
     with open(args.config) as f:
         config = json.load(f)
+
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
 
     port = config["Port"]
     server_list = config["servers"]
@@ -237,43 +270,81 @@ def main():
             bad.add(s['addr'])
 
     servers = set(servers)
-    print("server =", len(servers))
-
-    history = []
+#    servers = [servers.pop()]
+    print("Number of servers =", len(servers))
 
     pools = fetch_pool_ids()
 
+    df = pd.DataFrame()
+
+    timestamp_string = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     while True:
 
-        print("collecting telemetry... ", end='')
-        s=datetime.datetime.now()
-        df = collect_once(servers, port)
-        e=datetime.datetime.now()
-        print("time: {0}".format(e-s))
+        if args.current_metrics:
+            df = pd.read_pickle(args.current_metrics)
+#            df.to_csv('currentpkl.csv',index=False) 
+        else:
+            print("collecting telemetry... ", end='')
+            s=datetime.datetime.now()
+            df = collect_once(servers, port)
+            e=datetime.datetime.now()
+            print("time: {0}".format(e-s))
+            df['pool'] = df['pool'].map(pools).fillna(df['pool'])
+            base_name = "metrics"
+            pkl_filename = f"{base_name}_{timestamp_string}.pkl"
+            df.to_pickle(pkl_filename)
 
-        df['pool'] = df['pool'].map(pools)
+        base_name = "report"
+        report_filename = f"{base_name}_{timestamp_string}.csv"
 
-        history.append(df)
+        prev_df = pd.DataFrame()
 
-        all_data = pd.concat(history)
+        if args.previous_metrics:
+            prev_df = pd.read_pickle(args.previous_metrics)
+#            prev_df.to_csv('previouspkl.csv',index=False) 
+            merge_df = pd.merge(df,
+                prev_df,
+                on=["key","pool","rank", "target", "size"],
+                how="left",
+                suffixes=("_current","_previous")
+            )  
 
-        #for row in df[df['key'] == 'engine_pool_ops_pool_connect'].itertuples():
-        #for row in df[df['key'] == 'engine_pool_ops_cont_open'].itertuples():
-        for row in df[df['key'] == args.metric].itertuples():
-            #if row.value > 0:
-                print(row)
+            merge_df["delta"] = merge_df["value_current"].fillna(0) - merge_df["value_previous"].fillna(0) 
+            merge_df = merge_df.rename(columns={'delta': 'value'})          
+            merge_df = merge_df.drop(columns=["timestamp_current", "timestamp_previous"])
+            df = merge_df
+#            for row in df.itertuples():
+#            if row.value > 0.0:
+#                print(row)
+        df_filtered = df[df['target'] != -1]
 
-        if args.metric and args.ranks:
+        pivot_df = df_filtered.pivot(
+            index=['rank','target','size'],
+            columns='key',
+            values='value'
+        )
+        pivot_df['target_update_avg'] = np.where(pivot_df['engine_io_latency_tgt_update_samples'] == 0.0,0,pivot_df['engine_io_latency_tgt_update_sum'] / pivot_df['engine_io_latency_tgt_update_samples'])
+        pivot_df['fetch_avg'] = np.where(pivot_df['engine_io_latency_fetch_samples'] == 0.0,0,pivot_df['engine_io_latency_fetch_sum'] / pivot_df['engine_io_latency_fetch_samples'])
+#        print(pivot_df.to_string())
+#       print(pivot_df.sort_values(by='target_update_avg', ascending=False).head(20).to_string())
 
-            ranks = parse_rank_list(args.ranks)
+#        print("median value:")
+#        row = pivot_df.loc[(pivot_df['target_update_avg'] - pivot_df['target_update_avg'].median()).abs().idxmin()].to_string()
+#        print(row)
+# Flatten multi-level columns
+        pivot_df.columns = [
+            '_'.join(map(str, col)).strip()
+            if isinstance(col, tuple) else col
+            for col in pivot_df.columns
+        ]
 
-            plot_metric(all_data, args.metric, ranks)
+# Move index into columns
+        pivot_df = pivot_df.reset_index()
 
-        elif args.metric:
-
-            pivot, outliers = detect_outliers(all_data, args.metric)
-
-            plot_outliers(pivot, outliers)
+        pivot_df.sort_values(by='target_update_avg', ascending=False).to_csv(report_filename,index=False)
+#        for row in df.itertuples():
+#            if row.value > 0.0:
+#                print(row)
 
         if args.interval == 0:
             break
