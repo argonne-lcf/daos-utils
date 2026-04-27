@@ -88,7 +88,12 @@ def fetch_metrics(server, port):
         return parse_metrics(data, ts)
     except Exception as e:
         print("server failed = ", server, "with", e)
-        return {"timestamp": datetime.datetime.utcnow()}
+        return [{"timestamp": datetime.datetime.utcnow(),
+                "key": "None",
+                "rank": -1,
+                "pool": "None",
+                "target": -1,
+                "value": 0.0}]
 
 
 
