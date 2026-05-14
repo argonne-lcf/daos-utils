@@ -36,7 +36,7 @@ aurora_server_to_group = 64
 max_ranks = 0
 
 # need to decide how to compute
-min_bytes_per_rank = 128*1024*1024*1024
+min_bytes_per_rank = 1024*1024*1024*1024
 
 # max ratio of ranks to use
 max_ratio = 0.6
@@ -171,6 +171,7 @@ def select_ranks(groups, size_bytes):
 
   total_candidates = sum(len(items) for items in groups.values())
   target_ranks = min(target_ranks, total_candidates)
+  target_ranks = max(target_ranks, 80) # don't allow less than 80 ranks
 
   # Build fault-domain mapping from currently eligible members.
   domain_to_ranks = collections.defaultdict(set)
