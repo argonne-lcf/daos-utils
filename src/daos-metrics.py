@@ -61,7 +61,7 @@ def parse_metrics(text, timestamp):
         filled_size = m.group("size") if m.group("size") else "NA"
         filled_pool = m.group("pool") if m.group("pool") else "NA"
 
-        if ((m.group("key") in pool_strings) or ((m.group("key") in latency_strings) and ((m.group("size") == "128KB") or (m.group("size") == "1MB")))):
+        if ((m.group("key") in pool_strings) or ((m.group("key") in latency_strings) and ((m.group("size") == "128KB") or (m.group("size") == "512KB")))):
             rows.append({
                 "timestamp": timestamp,
                 "key": m.group("key"),
