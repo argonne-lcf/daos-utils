@@ -81,20 +81,36 @@ def parse_metrics(text, timestamp):
 
 def fetch_metrics(server, port):
     import urllib.request
+    import http.client
+    import time
 
-    try:
-        data = urllib.request.urlopen("http://{server}:{port}/metrics".format(server=server,port=port)).read().decode('utf-8')
-        ts = datetime.datetime.utcnow()
-        return parse_metrics(data, ts)
-    except Exception as e:
-        print("server failed = ", server, "with", e)
-        return [{"timestamp": datetime.datetime.utcnow(),
-                "key": "None",
-                "rank": -1,
-                "pool": "None",
-                "target": -1,
-                "value": 0.0}]
+    max_retries = 5
+    for attempt in range(1, max_retries):
 
+        try:
+            data = urllib.request.urlopen("http://{server}:{port}/metrics".format(server=server,port=port)).read().decode('utf-8')
+            ts = datetime.datetime.utcnow()
+            return parse_metrics(data, ts)
+        except http.client.IncompleteRead as e:
+            print("server =", server, "got IncompleteRead, attempt", attempt, "of", max_retries, "-", e)
+            if attempt == max_retries:
+                print("server failed = ", server, "with", e)
+                return [{"timestamp": datetime.datetime.utcnow(),
+                        "key": "None",
+                        "rank": -1,
+                        "pool": "None",
+                        "target": -1,
+                        "value": 0.0}]
+            time.sleep(0.5 * attempt)  # simple linear backoff
+
+        except Exception as e:
+            print("server failed = ", server, "with", e)
+            return [{"timestamp": datetime.datetime.utcnow(),
+                    "key": "None",
+                    "rank": -1,
+                    "pool": "None",
+                    "target": -1,
+                    "value": 0.0}]
 
 
 # ------------------------------------------------------------
