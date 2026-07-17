@@ -280,7 +280,7 @@ def main():
 #    else:
 #        servers.append("{0}-{1}-{2}".format(part[0], part[1], part[2]))
 
-    f = open("/lus/flare/logs/daos_admin/dmg_query/2026-06-27/dmg.system.query.2025-06-27.1.json", "rt")
+    f = open("/lus/flare/logs/daos_admin/dmg_query/2026-07-17/dmg.system.query.json", "rt")
     j = json.load(f)
     f.close()
     bad = set()
