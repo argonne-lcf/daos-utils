@@ -368,7 +368,7 @@ def main():
 #                print(row)
 
         pool_cont_open_df = df[(df['key'] == 'engine_pool_ops_cont_open') & (df['value'] > 0)]
-        print(pool_cont_open_df.to_string())
+        pool_cont_open_df = pool_cont_open_df.sort_values(by='value', ascending=False)
         total_cont_opens = pool_cont_open_df['value'].sum()
         num_pools = pool_cont_open_df['pool'].nunique()
         with open(report_filename, "a") as f:
