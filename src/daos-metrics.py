@@ -367,6 +367,16 @@ def main():
 #            if row.value > 0.0:
 #                print(row)
 
+        pool_cont_open_df = df[(df['key'] == 'engine_pool_ops_cont_open') & (df['value'] > 0)]
+        print(pool_cont_open_df.to_string())
+        total_cont_opens = pool_cont_open_df['value'].sum()
+        num_pools = pool_cont_open_df['pool'].nunique()
+        with open(report_filename, "a") as f:
+            f.write("\n\nPools, Cont Opens\n")
+            f.write(f"{num_pools},{total_cont_opens}\n\n")
+            for row in pool_cont_open_df.itertuples():
+                f.write(f"{row.pool},{row.value}\n")
+
         if args.interval == 0:
             break
 
