@@ -65,7 +65,7 @@ def dmg_storage_query(hosts):
   """Run dmg storage query usage --json"""
   host_list = ",".join(hosts)
   result = subprocess.run(
-    ["sudo", "dmg", "storage", "query", "usage", f"-l={host_list}", "--json"],
+    ["dmg", "storage", "query", "usage", f"-l={host_list}", "--json"],
     capture_output=True,
     text=True,
     check=True
@@ -75,7 +75,7 @@ def dmg_storage_query(hosts):
 def dmg_system_query():
   """Run dmg system query --json"""
   result = subprocess.run(
-    ["sudo", "dmg", "system", "query", "--json"],
+    ["dmg", "system", "query", "--json"],
     capture_output=True,
     text=True,
     check=True
