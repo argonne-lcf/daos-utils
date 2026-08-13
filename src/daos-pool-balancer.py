@@ -86,7 +86,7 @@ def dmg_system_query():
 # Collect all of the ranks into their drgaon fly groups
 #
 
-def build_groups(excluded_ranks):
+def build_groups(excluded_ranks, order):
   global max_ranks
   groups = collections.defaultdict(list)
 
@@ -98,7 +98,8 @@ def build_groups(excluded_ranks):
     system_ranks = dmg_system_query()
     hosts = set()
     for item in system_ranks["response"]["members"]:
-      hosts.add(item["fault_domain"][1:])
+      if item["state"] == "joined":
+        hosts.add(item["fault_domain"][1:])
     nvmes = dmg_storage_query(hosts)
 
   max_ranks = len(system_ranks["response"]["members"])
@@ -149,7 +150,14 @@ def build_groups(excluded_ranks):
 
   # sort each group
   for g in groups:
-    groups[g].sort(key=lambda x: x["avbytes"])
+    if order == 'rank':
+      groups[g].sort(key=lambda x: x["rank"])
+      d = collections.deque(groups[g])
+      rot = random.randint(0, len(groups[g])-1)
+      d.rotate(rot)
+      groups[g] = list(d)
+    else:
+      groups[g].sort(key=lambda x: x["avbytes"])
 
   # print
 #  for item in system_ranks["response"]["members"]:
@@ -247,6 +255,7 @@ def main():
   parser.add_argument("--user", required=True, help="Pool owner")
   parser.add_argument("--group", required=True, help="Primary unix group")
   parser.add_argument("--size", required=True, type=float, help="Pool size in TB")
+  parser.add_argument("--order", required=False, action='store', default='size', help="ordering for sort")
   parser.add_argument(
     "--exclude-ranks",
     default="",
@@ -258,7 +267,7 @@ def main():
 
   size_bytes = int(args.size * 2**40)
 
-  g = build_groups(excluded_ranks)
+  g = build_groups(excluded_ranks, args.order)
   ranks = select_ranks(g, size_bytes)
   gen_create(args.pool, args.user, args.group, args.size, ranks)
 
