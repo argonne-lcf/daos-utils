@@ -377,6 +377,33 @@ def main():
             for row in pool_cont_open_df.itertuples():
                 f.write(f"{row.pool},{row.value}\n")
 
+        size_128kb_df = df_filtered[df_filtered['size'] == '128KB']
+        size_512kb_df = df_filtered[df_filtered['size'] == '512KB']
+
+        size128kb_fetch_sum = size_128kb_df.loc[size_128kb_df['key'] == 'engine_io_latency_fetch_sum', 'value'].sum()
+        size128kb_fetch_samples = size_128kb_df.loc[size_128kb_df['key'] == 'engine_io_latency_fetch_samples', 'value'].sum()
+        size128kb_fetch_data = (size128kb_fetch_samples * 128) / (1024*1024)
+        size128kb_avg_fetch = ((size128kb_fetch_sum / size128kb_fetch_samples) / 1000) if size128kb_fetch_samples != 0 else 0
+
+        size128kb_update_sum = size_128kb_df.loc[size_128kb_df['key'] == 'engine_io_latency_tgt_update_sum', 'value'].sum()
+        size128kb_update_samples = size_128kb_df.loc[size_128kb_df['key'] == 'engine_io_latency_tgt_update_samples', 'value'].sum()
+        size128kb_update_data = (size128kb_update_samples * 128) / (1024*1024)
+        size128kb_avg_update = ((size128kb_update_sum / size128kb_update_samples) / 1000) if size128kb_update_samples != 0 else 0
+
+        size512kb_fetch_sum = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_fetch_sum', 'value'].sum()
+        size512kb_fetch_samples = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_fetch_samples', 'value'].sum()
+        size512kb_fetch_data = (size512kb_fetch_samples * 512) / (1024*1024)
+        size512kb_avg_fetch = size512kb_fetch_sum / size512kb_fetch_samples if size512kb_fetch_samples != 0 else 0
+
+        size512kb_update_sum = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_tgt_update_sum', 'value'].sum()
+        size512kb_update_samples = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_tgt_update_samples', 'value'].sum()
+        size512kb_update_data = (size512kb_update_samples * 512) / (1024*1024)
+        size512kb_avg_update = ((size512kb_update_sum / size512kb_update_samples) / 1000) if size512kb_update_samples != 0 else 0
+
+        with open(report_filename, "a") as f:
+            f.write("\n\n128KB Fetch Data,128KB Updata data,128KB Fetch Latency,128KB Update Latency,512KB Fetch Data,512KB Updata data,512KB Fetch Latency,512KB Update Latency\n")
+            f.write(f"{size128kb_fetch_data},{size128kb_update_data},{size128kb_avg_fetch},{size128kb_avg_update},{size512kb_fetch_data},{size512kb_update_data},{size512kb_avg_fetch},{size512kb_avg_update}\n\n")
+
         if args.interval == 0:
             break
 
