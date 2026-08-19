@@ -393,7 +393,7 @@ def main():
         size512kb_fetch_sum = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_fetch_sum', 'value'].sum()
         size512kb_fetch_samples = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_fetch_samples', 'value'].sum()
         size512kb_fetch_data = (size512kb_fetch_samples * 512) / (1024*1024)
-        size512kb_avg_fetch = size512kb_fetch_sum / size512kb_fetch_samples if size512kb_fetch_samples != 0 else 0
+        size512kb_avg_fetch = ((size512kb_fetch_sum / size512kb_fetch_samples) / 1000) if size512kb_fetch_samples != 0 else 0
 
         size512kb_update_sum = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_tgt_update_sum', 'value'].sum()
         size512kb_update_samples = size_512kb_df.loc[size_512kb_df['key'] == 'engine_io_latency_tgt_update_samples', 'value'].sum()
